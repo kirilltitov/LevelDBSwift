@@ -182,4 +182,82 @@ class LevelDBTests: XCTestCase {
             XCTFail("Iteration failed: \(message)")
         }
     }
+    
+    func testGetSubscript() {
+        do {
+            let db = try LevelDB(path: "/tmp/leveldb_tests/testGetSubscript", options: [.createIfMissing(true)])
+            
+            try db.put(key: "0", value: "hello")
+            
+            let value = db["0"]
+            XCTAssertNotNil(value)
+            XCTAssertEqual(value!, "hello")
+            
+            try db.destroy()
+        } catch let error {
+            var message: String
+            if let dbError = error as? LevelDB.DBError {
+                message = dbError.localizedDescription
+            } else {
+                message = error.localizedDescription
+            }
+            
+            XCTFail("Get subscript: \(message)")
+        }
+    }
+    
+    func testSetSubscript() {
+        do {
+            let db = try LevelDB(path: "/tmp/leveldb_tests/testSetSubscript", options: [.createIfMissing(true)])
+            
+            db["0"] = "hello"
+            
+            let value = try db.get(key: "0")
+            XCTAssertNotNil(value)
+            XCTAssertEqual(value!, "hello")
+            
+            try db.destroy()
+        } catch let error {
+            var message: String
+            if let dbError = error as? LevelDB.DBError {
+                message = dbError.localizedDescription
+            } else {
+                message = error.localizedDescription
+            }
+            
+            XCTFail("Set subscript failed: \(message)")
+        }
+    }
+    
+    func testRangeSubscript() {
+        do {
+            let db = try LevelDB(path: "/tmp/leveldb_tests/testGetSubscript", options: [.createIfMissing(true)])
+            
+            let writeBatch = WriteBatch()
+            writeBatch.put(key: "0", value: "zero")
+            writeBatch.put(key: "1", value: "hello")
+            writeBatch.put(key: "2", value: "hi")
+            writeBatch.put(key: "A", value: "zip")
+            try db.write(batch: writeBatch, writeOptions: [.sync(true)])
+            
+            let slice = db["1"..<"5"]
+            var count = 0
+            for (key, value) in slice {
+                print("\(key): \(value)")
+                count += 1
+            }
+            
+            XCTAssertEqual(count, 2)
+            try db.destroy()
+        } catch let error {
+            var message: String
+            if let dbError = error as? LevelDB.DBError {
+                message = dbError.localizedDescription
+            } else {
+                message = error.localizedDescription
+            }
+            
+            XCTFail("Iteration failed: \(message)")
+        }
+    }
 }
