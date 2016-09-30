@@ -15,6 +15,7 @@ public enum Compression: Int32 {
 }
 
 public enum Option {
+    case filterPolicy(FilterPolicy)
     case createIfMissing(Bool)
     case errorIfExists(Bool)
     case paranoidChecks(Bool)
@@ -27,6 +28,7 @@ public enum Option {
 }
 
 public class Options {
+    var filterPolicy: FilterPolicy? = nil
     var createIfMissing: Bool = false
     var errorIfExists: Bool = false
     var paranoidChecks: Bool = false
@@ -42,6 +44,8 @@ public class Options {
     public init(from options: [Option]) {
         for option in options {
             switch option {
+            case .filterPolicy(let filterPolicy):
+                self.filterPolicy = filterPolicy
             case .createIfMissing(let create):
                 self.createIfMissing = create
             case .errorIfExists(let error):
@@ -80,6 +84,10 @@ public class Options {
         if self.cacheCapacity != -1, let cache = leveldb_cache_create_lru(self.cacheCapacity) {
             self.cachePtr = cache
             leveldb_options_set_cache(optionsPtr, cache)
+        }
+        
+        if let filterPolicy = self.filterPolicy {
+            leveldb_options_set_filter_policy(optionsPtr, filterPolicy.pointer)
         }
         
         return optionsPtr

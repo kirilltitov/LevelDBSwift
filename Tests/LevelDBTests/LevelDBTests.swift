@@ -11,7 +11,11 @@ class LevelDBTests: XCTestCase {
             ("testGet", testGet),
             ("testDelete", testDelete),
             ("testWriteBatch", testWriteBatch),
-            ("testIteration", testIteration)
+            ("testIteration", testIteration),
+            ("testGetSubscript", testGetSubscript),
+            ("testSetSubscript", testSetSubscript),
+            ("testRangeSubscript", testRangeSubscript),
+            ("testFilterPolicy", testFilterPolicy)
         ]
     }
     
@@ -231,7 +235,7 @@ class LevelDBTests: XCTestCase {
     
     func testRangeSubscript() {
         do {
-            let db = try LevelDB(path: "/tmp/leveldb_tests/testGetSubscript", options: [.createIfMissing(true)])
+            let db = try LevelDB(path: "/tmp/leveldb_tests/testRangeSubscript", options: [.createIfMissing(true)])
             
             let writeBatch = WriteBatch()
             writeBatch.put(key: "0", value: "zero")
@@ -248,6 +252,40 @@ class LevelDBTests: XCTestCase {
             }
             
             XCTAssertEqual(count, 2)
+            try db.destroy()
+        } catch let error {
+            var message: String
+            if let dbError = error as? LevelDB.DBError {
+                message = dbError.localizedDescription
+            } else {
+                message = error.localizedDescription
+            }
+            
+            XCTFail("Iteration failed: \(message)")
+        }
+    }
+    
+    func testFilterPolicy() {
+        do {
+            guard let filterPolicy = FilterPolicy.bloomFilter(bitsPerKey: 10) else {
+                XCTFail("Could not create filter policy.")
+                return
+            }
+            
+            let db = try LevelDB(path: "/tmp/leveldb_tests/testFilterPolicy", options: [
+                .createIfMissing(true),
+                .filterPolicy(filterPolicy)
+            ])
+            
+            let writeBatch = WriteBatch()
+            writeBatch.put(key: "0", value: "zero")
+            writeBatch.put(key: "1", value: "hello")
+            writeBatch.put(key: "2", value: "hi")
+            writeBatch.put(key: "A", value: "zip")
+            try db.write(batch: writeBatch, writeOptions: [.sync(true)])
+            
+            _ = try db.get(key: "0")
+            
             try db.destroy()
         } catch let error {
             var message: String
