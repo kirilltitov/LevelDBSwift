@@ -6,7 +6,24 @@
 //
 //
 
+import Foundation
 import CLevelDB
+
+func encodeUTF8(_ string: String) throws -> Data {
+    guard let data = string.data(using: .utf8) else {
+        throw LevelDB.DBError(message: "Could not encode string to utf8.")
+    }
+    
+    return data
+}
+
+func decodeUTF8(_ data: Data) throws -> String {
+    guard let str = String(data: data, encoding: .utf8) else {
+        throw LevelDB.DBError(message: "Could not decode string from utf8.")
+    }
+    
+    return str
+}
 
 public class LevelDB: Sequence {
     public struct DBError: Error {
@@ -48,9 +65,7 @@ public class LevelDB: Sequence {
     }
     
     public func get(key: String, readOptions: [ReadOption] = []) throws -> String? {
-        if self.closed {
-            throw DBError(message: "Cannot get from closed database.")
-        }
+        try self.verifyOpen()
         
         guard let optionsPtr = ReadOptions(from: readOptions).toOpaque() else {
             throw DBError(message: "Could not create read options.")
@@ -72,10 +87,18 @@ public class LevelDB: Sequence {
         return String(cString: UnsafePointer(value!))
     }
     
-    public func put(key: String, value: String, writeOptions: [WriteOption] = []) throws {
-        if self.closed {
-            throw DBError(message: "Cannot put to closed database.")
+    public func get(key: Data, readOptions: [ReadOption] = []) throws -> Data? {
+        let keyStr = try decodeUTF8(key)
+        
+        guard let valueStr = try self.get(key: keyStr, readOptions: readOptions) else {
+            return nil
         }
+        
+        return try encodeUTF8(valueStr)
+    }
+    
+    public func put(key: String, value: String, writeOptions: [WriteOption] = []) throws {
+        try self.verifyOpen()
         
         guard let optionsPtr = WriteOptions(from: writeOptions).toOpaque() else {
             throw DBError(message: "Could not create write options.")
@@ -92,10 +115,21 @@ public class LevelDB: Sequence {
         }
     }
     
+    public func put(key: String, value: Data, writeOptions: [WriteOption] = []) throws {
+        let valStr = try decodeUTF8(value)
+        
+        try self.put(key: key, value: valStr, writeOptions: writeOptions)
+    }
+    
+    public func put(key: Data, value: Data, writeOptions: [WriteOption] = []) throws {
+        let keyStr = try decodeUTF8(key)
+        let valStr = try decodeUTF8(value)
+        
+        try self.put(key: keyStr, value: valStr, writeOptions: writeOptions)
+    }
+    
     public func delete(key: String, writeOptions: [WriteOption] = []) throws {
-        if self.closed {
-            throw DBError(message: "Cannot delete from closed database.")
-        }
+        try self.verifyOpen()
         
         guard let optionsPtr = WriteOptions(from: writeOptions).toOpaque() else {
             throw DBError(message: "Could not create write options.")
@@ -112,10 +146,14 @@ public class LevelDB: Sequence {
         }
     }
     
+    public func delete(key: Data, writeOptions: [WriteOption] = []) throws {
+        let keyStr = try decodeUTF8(key)
+        
+        try self.delete(key: keyStr, writeOptions: writeOptions)
+    }
+    
     public func write(batch: WriteBatch, writeOptions: [WriteOption] = []) throws {
-        if self.closed {
-            throw DBError(message: "Cannot write to closed database.")
-        }
+        try self.verifyOpen()
         
         guard let optionsPtr = WriteOptions(from: writeOptions).toOpaque() else {
             throw DBError(message: "Could not create write options.")
@@ -161,6 +199,12 @@ public class LevelDB: Sequence {
     
     public func makeIterator() -> LevelDB.Iterator {
         return Iterator(db: self)
+    }
+    
+    private func verifyOpen() throws {
+        if self.closed {
+            throw DBError(message: "Cannot write to closed database.")
+        }
     }
     
     deinit {

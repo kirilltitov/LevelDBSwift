@@ -47,6 +47,18 @@ class LevelDBTests: XCTestCase {
             
             XCTAssertEqual(value, "world")
             
+            let keyFoo = "❤️"
+            let valBar = "😍"
+            let valBarData = valBar.data(using: .utf8)!
+            try db.put(key: keyFoo, value: valBarData)
+            guard let valueData = try db.get(key: keyFoo.data(using: .utf8)!) else {
+                XCTFail("Put failed (data): `value` for \"\(keyFoo)\" is nil")
+                return
+            }
+            
+            XCTAssertEqual(valBarData, valueData)
+            XCTAssertEqual(valBar, String(data: valueData, encoding: .utf8)!)
+            
             try db.destroy()
         } catch let error {
             var message: String
@@ -63,19 +75,39 @@ class LevelDBTests: XCTestCase {
     func testGet() {
         do {
             let db = try LevelDB(path: "/tmp/leveldb_tests/testGet", options: [.createIfMissing(true)])
+            let key = "Get me!"
+            let value = "2"
             
-            try db.put(key: "Get me!", value: "2", writeOptions: [.sync(true)])
-            guard let value = try db.get(key: "Get me!") else {
-                XCTFail("Get failed: `value` for \"Get me!\" is nil")
+            try db.put(key: key, value: value, writeOptions: [.sync(true)])
+            guard let valueFromDB = try db.get(key: key) else {
+                XCTFail("Get failed: `value` for \"\(key)\" is nil")
                 return
             }
-            XCTAssertEqual(value, "2")
+            XCTAssertEqual(valueFromDB, value)
+
+            guard let keyData = key.data(using: .utf8) else {
+                XCTFail("Could not encode string as utf8 data.")
+                return
+            }
             
-            try db.delete(key: "Get me!", writeOptions: [.sync(true)])
+            guard let valueData = value.data(using: .utf8) else {
+                XCTFail("Could not encode string as utf8 data.")
+                return
+            }
+            
+            guard let valueDataFromDB = try db.get(key: keyData) else {
+                XCTFail("Get failed (data): `value` for \"\(key)\" is nil")
+                return
+            }
+            
+            XCTAssertEqual(valueDataFromDB, valueData)
             
             // "Dummy" should not exist
             let dummy = try db.get(key: "Dummy")
             XCTAssertNil(dummy)
+            
+            // clean up
+            try db.delete(key: "Get me!", writeOptions: [.sync(true)])
             
             try db.destroy()
         } catch let error {
@@ -117,12 +149,16 @@ class LevelDBTests: XCTestCase {
             let db = try LevelDB(path: "/tmp/leveldb_tests/testWriteBatch", options: [.createIfMissing(true)])
             
             try db.put(key: "Del", value: "0")
+            try db.put(key: "Hello,", value: "world")
             
             let batch = WriteBatch()
             batch.put(key: "0", value: "zero")
             batch.put(key: "1", value: "one")
             batch.put(key: "2", value: "two")
+            try batch.put(key: "3", value: "three".data(using: .utf8)!)
+            try batch.put(key: "4".data(using: .utf8)!, value: "four".data(using: .utf8)!)
             batch.delete(key: "Del")
+            try batch.delete(key: "Hello,".data(using: .utf8)!)
             try db.write(batch: batch, writeOptions: [.sync(true)])
             
             let zero = try db.get(key: "0")
@@ -142,6 +178,7 @@ class LevelDBTests: XCTestCase {
             deleteAll.delete(key: "0")
             deleteAll.delete(key: "1")
             deleteAll.delete(key: "2")
+            deleteAll.delete(key: "3")
             try db.write(batch: deleteAll, writeOptions: [.sync(true)])
             
             try db.destroy()
@@ -165,6 +202,8 @@ class LevelDBTests: XCTestCase {
             batch.put(key: "1", value: "hi")
             batch.put(key: "2", value: "hello")
             batch.put(key: "3", value: "bye")
+            try batch.put(key: "4", value: "❤️".data(using: .utf8)!)
+            try batch.put(key: "5", value: "😊".data(using: .utf8)!)
             try db.write(batch: batch, writeOptions: [.sync(true)])
             
             var count = 0
@@ -173,7 +212,7 @@ class LevelDBTests: XCTestCase {
                 count += 1
             }
             
-            XCTAssertEqual(count, 3)
+            XCTAssertEqual(count, 5)
             try db.destroy()
         } catch let error {
             var message: String

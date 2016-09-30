@@ -20,8 +20,24 @@ public class WriteBatch {
         leveldb_writebatch_put(self.ptr, key, key.utf8CString.count, value, value.utf8CString.count)
     }
     
+    public func put(key: String, value: Data) throws {
+        let valStr = try decodeUTF8(value)
+        self.put(key: key, value: valStr)
+    }
+    
+    public func put(key: Data, value: Data) throws {
+        let keyStr = try decodeUTF8(key)
+        let valStr = try decodeUTF8(value)
+        self.put(key: keyStr, value: valStr)
+    }
+    
     public func delete(key: String) {
         leveldb_writebatch_delete(self.ptr, key, key.utf8CString.count)
+    }
+    
+    public func delete(key: Data) throws {
+        let keyStr = try decodeUTF8(key)
+        self.delete(key: keyStr)
     }
     
     public func clear() {
