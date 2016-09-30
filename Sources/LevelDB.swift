@@ -23,7 +23,7 @@ public class LevelDB: Sequence {
     public var options: Options
     public var closed: Bool = true
     
-    init(path: String, options: [Option] = []) throws {
+    public init(path: String, options: [Option] = []) throws {
         self.path = path
         self.options = Options(from: options)
         guard let optionsPtr = self.options.toOpaque() else {
